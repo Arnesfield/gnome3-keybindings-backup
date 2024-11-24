@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+
+# help text and args
+if [ $# -eq 0 ]; then
+  echo 'Usage: gnome3-keybindings-backup backup'
+  echo '       gnome3-keybindings-backup restore'
+  exit 0
+elif [ "$1" != 'backup' ] && [ "$1" != 'restore' ]; then
+  echo "invalid argument: $1"
+  exit 1
+fi
+
+name="keybindings-$(date "+%Y-%m-%d")"
+dir="tmp-$name"
+fileName="$name.zip"
+
+if [ "$1" == 'backup' ]; then
+  # validate file and directory
+  if [ -d "$dir" ] || [ -f "$dir" ]; then
+    echo "File or directory '$dir' already exists."
+    exit 1
+  elif [ -d "$fileName" ]; then
+    echo "Target file '$fileName' is a directory."
+    exit 1
+  elif [ -f "$fileName" ]; then
+    # confirm overwrite
+    echo "Target file '$fileName' already exists."
+    read -p "Overwrite existing file? [y/N] " -n 1 -r
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+      # add new line
+      echo
+    else
+      exit 1
+    fi
+  fi
+
+  # create backup
+  mkdir -v "$dir"
+  dconf dump '/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/' >"$dir/custom-values.dconf"
+  dconf read '/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings' >"$dir/custom-keys.dconf"
+  dconf dump '/org/gnome/desktop/wm/keybindings/' >"$dir/keybindings.dconf"
+  dconf dump '/org/gnome/shell/keybindings/' >"$dir/shell-keybindings.dconf"
+
+  # zip files
+  cd "$dir" || exit 1
+  zip -9v "../$fileName" ./*
+
+  # safely remove files
+  cd ..
+  rm -v \
+    "$dir/custom-values.dconf" \
+    "$dir/custom-keys.dconf" \
+    "$dir/keybindings.dconf" \
+    "$dir/shell-keybindings.dconf"
+  rmdir -v "$dir"
+elif [ "$1" == 'restore' ]; then
+  # TODO: implement restore
+  echo error: not implemented
+  exit 1
+fi
